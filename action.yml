@@ -1,0 +1,39 @@
+name: "Chaukidar — PII & Secret Scan"
+description: "The watchman for your repo. Flags hardcoded PII and secrets on every push or PR."
+author: "meemsheen"
+
+branding:
+  icon: "eye"
+  color: "purple"
+
+inputs:
+  path:
+    description: "Directory to scan."
+    required: false
+    default: "."
+  fail-on:
+    description: "Fail the check at/above this severity: off | low | medium | high."
+    required: false
+    default: "high"
+  scan:
+    description: "Scan 'changed' files (git diff) or 'all' files."
+    required: false
+    default: "changed"
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+    - name: Build Chaukidar
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm install && npm run build
+    - name: Run Chaukidar
+      shell: bash
+      run: >
+        node "${{ github.action_path }}/dist/cli.js" scan "${{ inputs.path }}"
+        --fail-on="${{ inputs.fail-on }}"
+        --scan="${{ inputs.scan }}"
+        --annotate

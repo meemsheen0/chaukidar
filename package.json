@@ -1,0 +1,24 @@
+{
+  "name": "chaukidar",
+  "version": "0.1.0",
+  "description": "The watchman for your repo — scans for hardcoded PII and secrets before they land on main.",
+  "keywords": ["pii", "privacy", "secrets", "security", "github-action", "pre-commit", "scanner"],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "chaukidar": "dist/cli.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "scan": "node dist/cli.js scan",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}

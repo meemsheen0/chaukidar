@@ -1,0 +1,20 @@
+# Chaukidar config — copy to .chaukidar.yml. All keys optional.
+
+# Fail the check at/above this severity: off | low | medium | high
+fail-on: high
+
+# Scan "changed" files (git diff) or "all" files
+scan: changed
+
+ignore:
+  # Glob paths to skip entirely (supports * and **)
+  paths:
+    - "test/fixtures/**"
+    - "**/*.test.ts"
+  # Exact values that are known-safe (your real support inbox, etc.)
+  patterns:
+    - "support@meemsheen.com"
+
+detectors:
+  # Turn individual detectors off by setting them to "off"
+  ip-address: off
