@@ -1,0 +1,32 @@
+# Chaukidar self-scan (dogfooding)
+#
+# Runs Chaukidar against its own source on every PR and push to main.
+#
+# `uses: ./` runs the action from the CURRENT checkout, not the published
+# @v1 tag — intentional for dogfooding, so a broken change fails its own
+# scan before release. The composite action (action.yml) builds itself,
+# so no Node setup or build steps are needed here.
+#
+# test/fixtures contains PLANTED PII on purpose; .chaukidar.yml at the
+# repo root excludes it so the self-scan doesn't always fail.
+
+name: Self-scan
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./
+        with:
+          fail-on: high
+          scan: all

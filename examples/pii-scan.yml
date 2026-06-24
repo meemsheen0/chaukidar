@@ -1,0 +1,28 @@
+# Chaukidar PII / secret scan
+#
+# Copy this file into your repo at: .github/workflows/pii-scan.yml
+# It runs on every pull request and blocks the merge if Chaukidar finds
+# anything at or above the `fail-on` severity.
+
+name: PII Scan
+
+on:
+  pull_request:
+  # Uncomment to also scan pushes to main, and to allow manual runs:
+  # push:
+  #   branches: [main]
+  # workflow_dispatch:
+
+jobs:
+  chaukidar:
+    runs-on: ubuntu-latest
+    steps:
+      # Runners start empty — check out the PR's code first.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history; required for scan: changed
+
+      - uses: meemsheen0/chaukidar@v1
+        with:
+          fail-on: high           # off | low | medium | high
+          scan: changed           # changed | all

@@ -1,0 +1,7 @@
+# Chaukidar config for the chaukidar repo itself.
+fail-on: high
+scan: all
+ignore:
+  paths:
+    # Test fixtures contain planted PII/secrets on purpose.
+    - "test/fixtures/**"
