@@ -23,6 +23,33 @@ function isPrivateOrReserved(parts: number[]): boolean {
   return false;
 }
 
+// Public DNS resolvers — overwhelmingly used as examples, not as leaked PII.
+const PUBLIC_DNS = new Set([
+  "1.1.1.1", "1.0.0.1",            // Cloudflare
+  "8.8.8.8", "8.8.4.4",            // Google
+  "9.9.9.9", "149.112.112.112",   // Quad9
+  "208.67.222.222", "208.67.220.220", // OpenDNS
+  "4.2.2.1", "4.2.2.2",           // Level3 (legacy)
+]);
+
+/** Documentation, benchmarking, and placeholder addresses — not real PII. */
+function isDummyOrDocumentation(parts: number[], value: string): boolean {
+  if (PUBLIC_DNS.has(value)) return true;
+
+  const [a, b, c] = parts;
+  // RFC 5737 documentation ranges.
+  if (a === 192 && b === 0 && c === 2) return true;     // 192.0.2.0/24
+  if (a === 198 && b === 51 && c === 100) return true;  // 198.51.100.0/24
+  if (a === 203 && b === 0 && c === 113) return true;   // 203.0.113.0/24
+  // RFC 2544 benchmarking range.
+  if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15
+
+  // Single-digit repeated-octet placeholders: 1.1.1.1, 8.8.8.8, 9.9.9.9, …
+  if (parts.every((p) => p === a) && a <= 9) return true;
+
+  return false;
+}
+
 export const ipAddress: Detector = {
   type: "ip-address",
   label: "IP address",
@@ -33,7 +60,9 @@ export const ipAddress: Detector = {
       const value = m[0];
       const parts = [m[1], m[2], m[3], m[4]];
       if (!isValidOctets(parts)) continue;
-      if (isPrivateOrReserved(parts.map(Number))) continue;
+      const nums = parts.map(Number);
+      if (isPrivateOrReserved(nums)) continue;
+      if (isDummyOrDocumentation(nums, value)) continue;
       if (ctx.isAllowed(value)) continue;
       out.push({
         type: this.type,

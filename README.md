@@ -89,8 +89,8 @@ npx chaukidar . --scan=changed --fail-on=high
 | Email address | medium | dummy domains (`example.com`, `test@…`) allowlisted |
 | Phone number | medium | NANP / E.164; `555-01xx` test range ignored |
 | US SSN | high | invalid area/group/serial ranges excluded |
-| Credit card | high | Luhn-validated to cut false positives |
-| IP address | low | private / reserved ranges skipped |
+| Credit card | high | Luhn + issuer-prefix/length + card-shaped grouping, to cut false positives |
+| IP address | low | private/reserved, public-DNS, and RFC 5737 doc ranges skipped |
 | API key / token | high | AWS, GitHub, OpenAI, Slack, Google, Stripe, JWT, private keys |
 
 Matches are always **masked** in output (`jo******hn`) so Chaukidar never reprints a full secret.

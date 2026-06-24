@@ -20,3 +20,10 @@ const testPhone = "+1 555-0123";              // 555-01xx test range
 const testCard = "4111 1111 1111 1111";       // known test card
 const localIp = "192.168.1.1";                // private range
 const loopback = "127.0.0.1";                 // reserved
+
+// --- Regression: numeric-data false positives that must stay quiet ---
+const svgArmPath = "M385 360 C440 330 465 290 475 240"; // SVG coords, not a card
+const oddGrouping = "440 330 465 290 475";    // 15 digits in 3s, Luhn-ok but not a card
+const cloudflareDns = "1.1.1.1";              // public DNS resolver, example IP
+const googleDns = "8.8.8.8";                  // public DNS resolver, example IP
+const docIp = "192.0.2.55";                   // RFC 5737 documentation range
