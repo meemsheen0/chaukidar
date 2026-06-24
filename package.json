@@ -4,11 +4,20 @@
   "description": "The watchman for your repo — scans for hardcoded PII and secrets before they land on main.",
   "keywords": ["pii", "privacy", "secrets", "security", "github-action", "pre-commit", "scanner"],
   "license": "MIT",
+  "author": "meemsheen",
+  "homepage": "https://github.com/meemsheen0/chaukidar#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/meemsheen0/chaukidar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/meemsheen0/chaukidar/issues"
+  },
   "type": "module",
   "bin": {
     "chaukidar": "dist/cli.js"
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc",
     "scan": "node dist/cli.js scan",

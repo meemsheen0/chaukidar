@@ -45,13 +45,20 @@ npx chaukidar . --fail-on=medium --scan=all
 
 ### Audit many repos at once
 
-Pass several paths and Chaukidar prints a combined summary table plus per-repo
-detail, and exits non-zero if **any** repo trips its threshold:
+A target can be a local path **or a remote git URL** (`https://`, `git@`,
+`ssh://`, or anything ending in `.git`) — remote repos are shallow-cloned to a
+temp dir, scanned, then deleted (nothing is uploaded). Pass several targets and
+Chaukidar prints a combined summary table plus per-repo detail, and exits
+non-zero if **any** repo trips its threshold:
 
 ```bash
 npx chaukidar ~/code/app1 ~/code/app2 ~/code/app3
-npx chaukidar ~/code/*            # shell-expanded glob
+npx chaukidar ~/code/*                         # shell-expanded glob
+npx chaukidar https://github.com/org/repo      # remote, cloned then scanned
 ```
+
+A target that can't be reached (missing path, failed clone) is reported in a
+"Could not scan" section instead of crashing the run.
 
 ```
 چوکیدار  Chaukidar — 3 repo(s): 4 finding(s) across 3 file(s)

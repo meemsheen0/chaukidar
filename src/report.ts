@@ -81,29 +81,35 @@ export function shouldFail(findings: Finding[], failOn: Severity | "off"): boole
 
 /** One repo's worth of results, for multi-repo runs. */
 export interface RepoResult {
-  /** Absolute path scanned. */
+  /** Absolute path scanned (or the original argument, if it failed). */
   repo: string;
-  /** Short display name (usually the folder name). */
+  /** Short display name (usually the folder or repo name). */
   name: string;
   findings: Finding[];
   filesScanned: number;
   failOn: Severity | "off";
+  /** Set when the repo could not be scanned (bad path, clone failure, …). */
+  error?: string;
 }
 
 /** Combined terminal report across several repos: a summary table, then detail. */
 export function toMultiConsole(results: RepoResult[]): string {
-  const totalFindings = results.reduce((n, r) => n + r.findings.length, 0);
-  const totalFiles = results.reduce((n, r) => n + r.filesScanned, 0);
+  const scanned = results.filter((r) => !r.error);
+  const errored = results.filter((r) => r.error);
+  const totalFindings = scanned.reduce((n, r) => n + r.findings.length, 0);
+  const totalFiles = scanned.reduce((n, r) => n + r.filesScanned, 0);
   const lines: string[] = [
     `چوکیدار  Chaukidar — ${results.length} repo(s): ${totalFindings} finding(s) across ${totalFiles} file(s)`,
     "",
   ];
 
   const nameW = Math.max(4, ...results.map((r) => r.name.length));
-  lines.push(
-    `    ${"REPO".padEnd(nameW)}   HIGH   MED   LOW    FILES`
-  );
+  lines.push(`    ${"REPO".padEnd(nameW)}   HIGH   MED   LOW    FILES`);
   for (const r of results) {
+    if (r.error) {
+      lines.push(`  ! ${r.name.padEnd(nameW)}      —     —     —        —`);
+      continue;
+    }
     const c = countBySeverity(r.findings);
     const flag = shouldFail(r.findings, r.failOn) ? "✗" : "✓";
     lines.push(
@@ -115,7 +121,7 @@ export function toMultiConsole(results: RepoResult[]): string {
     );
   }
 
-  for (const r of results) {
+  for (const r of scanned) {
     if (!r.findings.length) continue;
     lines.push("", `  ── ${r.name} ──`);
     for (const f of sortFindings(r.findings)) {
@@ -123,6 +129,11 @@ export function toMultiConsole(results: RepoResult[]): string {
         `  ${ICON[f.severity]} ${f.severity.toUpperCase().padEnd(6)} ${f.file}:${f.line}:${f.column}  ${f.label}  →  ${f.match}`
       );
     }
+  }
+
+  if (errored.length) {
+    lines.push("", "  Could not scan:");
+    for (const r of errored) lines.push(`  ! ${r.name} — ${r.error}`);
   }
   return lines.join("\n");
 }
@@ -140,6 +151,10 @@ export function toMultiMarkdown(results: RepoResult[]): string {
     "| --- | ---: | ---: | ---: | ---: | :---: |",
   ];
   for (const r of results) {
+    if (r.error) {
+      out.push(`| ${r.name} | — | — | — | — | ⚠️ ${r.error} |`);
+      continue;
+    }
     const c = countBySeverity(r.findings);
     const status = shouldFail(r.findings, r.failOn) ? "❌ fail" : "✅ pass";
     out.push(
@@ -147,7 +162,7 @@ export function toMultiMarkdown(results: RepoResult[]): string {
     );
   }
   for (const r of results) {
-    if (!r.findings.length) continue;
+    if (r.error || !r.findings.length) continue;
     out.push(
       "",
       `## ${r.name}`,
