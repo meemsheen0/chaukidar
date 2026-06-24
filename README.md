@@ -76,6 +76,25 @@ Add `--report[=file]` to also write a shareable Markdown report
 npx chaukidar ~/code/* --scan=all --report=audit.md
 ```
 
+### Scan git history
+
+Most leaks don't live in the current files — a secret committed once and
+"removed" later still sits in history. `--scan=history` walks **every version of
+every file ever committed** (deduped by blob), so it catches secrets the
+working-tree scan can't see:
+
+```bash
+npx chaukidar . --scan=history
+npx chaukidar https://github.com/org/repo --scan=history   # full clone, then history
+```
+
+Each finding is tagged with the blob SHA (e.g. `config.js:1@f8794c459`). Locate
+the exact commit with:
+
+```bash
+git log --all --oneline --find-object=<sha>
+```
+
 As a pre-commit hook (with [husky](https://typicode.github.io/husky/) or similar):
 
 ```bash

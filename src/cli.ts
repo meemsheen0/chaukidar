@@ -43,7 +43,8 @@ target, the current directory is scanned.
 
 Options:
   --fail-on=<off|low|medium|high>   Exit non-zero at/above this severity (default: "high")
-  --scan=<changed|all>              Scan changed files (git) or the whole tree (default: all)
+  --scan=<changed|all|history>      Changed files (git), the whole tree, or every
+                                    version in git history (default: all)
   --format=<console|markdown>       Output format (default: console)
   --report[=<file>]                 Also write a markdown report (default: chaukidar-report.md)
   --annotate                        Emit GitHub Actions inline annotations (single repo)
@@ -54,6 +55,7 @@ Examples:
   chaukidar ~/code/app1 ~/code/app2 ~/code/app3
   chaukidar https://github.com/org/repo
   chaukidar ~/code/* --report=audit.md
+  chaukidar . --scan=history          # scan every version in git history
   chaukidar scan . --fail-on=medium
 `;
 
@@ -71,12 +73,15 @@ function main() {
 
   const overrides: Partial<Config> = {};
   if (flags["fail-on"]) overrides.failOn = flags["fail-on"] as Severity | "off";
-  if (flags.scan === "changed" || flags.scan === "all") overrides.scan = flags.scan;
+  if (flags.scan === "changed" || flags.scan === "all" || flags.scan === "history") {
+    overrides.scan = flags.scan;
+  }
+  const wantHistory = flags.scan === "history";
 
   // Resolve each target (cloning remotes) and scan it. Failures are captured
   // per-repo so one bad target never crashes the whole run.
   const results: RepoResult[] = targets.map((target) => {
-    const src = resolveSource(target);
+    const src = resolveSource(target, { fullHistory: wantHistory });
     if (src.error || !src.dir) {
       return {
         repo: src.input,
@@ -88,10 +93,11 @@ function main() {
       };
     }
     try {
-      // A fresh shallow clone has no diff base, so always scan it in full.
-      const perOverrides: Partial<Config> = src.isRemote
-        ? { ...overrides, scan: "all" }
-        : overrides;
+      // A fresh shallow clone has no diff base, so a remote "changed" scan is
+      // meaningless — fall back to a full-tree scan. History mode is honored
+      // (the clone was made with full history above).
+      const perOverrides: Partial<Config> =
+        src.isRemote && !wantHistory ? { ...overrides, scan: "all" } : overrides;
       const config = loadConfig(src.dir, perOverrides);
       const { findings, filesScanned } = scanRepo(src.dir, config);
       return {

@@ -7,6 +7,11 @@ const ICON: Record<Severity, string> = {
   low: "🟡",
 };
 
+/** "path:line" plus the blob SHA when the finding comes from git history. */
+function locate(f: Finding): string {
+  return `${f.file}:${f.line}${f.commit ? `@${f.commit}` : ""}`;
+}
+
 function sortFindings(findings: Finding[]): Finding[] {
   return [...findings].sort(
     (a, b) =>
@@ -33,7 +38,7 @@ export function toConsole(findings: Finding[], filesScanned: number): string {
   ];
   for (const f of sortFindings(findings)) {
     lines.push(
-      `  ${ICON[f.severity]} ${f.severity.toUpperCase().padEnd(6)} ${f.file}:${f.line}:${f.column}  ${f.label}  →  ${f.match}`
+      `  ${ICON[f.severity]} ${f.severity.toUpperCase().padEnd(6)} ${f.file}:${f.line}:${f.column}${f.commit ? `@${f.commit}` : ""}  ${f.label}  →  ${f.match}`
     );
   }
   return lines.join("\n");
@@ -48,7 +53,7 @@ export function toMarkdown(findings: Finding[], filesScanned: number): string {
   const rows = sortFindings(findings)
     .map(
       (f) =>
-        `| ${ICON[f.severity]} ${f.severity} | \`${f.file}:${f.line}\` | ${f.label} | \`${f.match}\` |`
+        `| ${ICON[f.severity]} ${f.severity} | \`${locate(f)}\` | ${f.label} | \`${f.match}\` |`
     )
     .join("\n");
   return [
@@ -126,7 +131,7 @@ export function toMultiConsole(results: RepoResult[]): string {
     lines.push("", `  ── ${r.name} ──`);
     for (const f of sortFindings(r.findings)) {
       lines.push(
-        `  ${ICON[f.severity]} ${f.severity.toUpperCase().padEnd(6)} ${f.file}:${f.line}:${f.column}  ${f.label}  →  ${f.match}`
+        `  ${ICON[f.severity]} ${f.severity.toUpperCase().padEnd(6)} ${f.file}:${f.line}:${f.column}${f.commit ? `@${f.commit}` : ""}  ${f.label}  →  ${f.match}`
       );
     }
   }

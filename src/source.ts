@@ -41,15 +41,25 @@ function repoNameFromUrl(url: string): string {
 
 const noop = () => {};
 
-/** Resolve one argument to a scannable local directory (cloning if remote). */
-export function resolveSource(input: string): Source {
+/**
+ * Resolve one argument to a scannable local directory (cloning if remote).
+ * Pass `fullHistory` to clone the entire history (needed for scan: history);
+ * otherwise remotes are shallow-cloned for speed.
+ */
+export function resolveSource(
+  input: string,
+  opts: { fullHistory?: boolean } = {}
+): Source {
   if (isRemote(input)) {
     const name = repoNameFromUrl(input);
     let dir: string | undefined;
     try {
       dir = mkdtempSync(join(tmpdir(), "chaukidar-"));
       // Arg array (not a shell string) so the URL can't be injected.
-      execFileSync("git", ["clone", "--depth", "1", "--quiet", "--", input, dir], {
+      const cloneArgs = opts.fullHistory
+        ? ["clone", "--quiet", "--", input, dir]
+        : ["clone", "--depth", "1", "--quiet", "--", input, dir];
+      execFileSync("git", cloneArgs, {
         stdio: ["ignore", "ignore", "pipe"],
       });
       const cloned = dir;

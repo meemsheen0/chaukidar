@@ -20,6 +20,8 @@ export interface Finding {
   column: number;
   /** The matched text, already masked for display. */
   match: string;
+  /** Short blob SHA when the finding comes from git history (scan: history). */
+  commit?: string;
 }
 
 /** A detector inspects one line and returns zero or more findings. */
@@ -40,8 +42,8 @@ export interface Detector {
 export interface Config {
   /** off | low | medium | high — fail the run at/above this severity. */
   failOn: Severity | "off";
-  /** "changed" (git diff) | "all" (whole tree). */
-  scan: "changed" | "all";
+  /** "changed" (git diff) | "all" (whole tree) | "history" (every git blob ever committed). */
+  scan: "changed" | "all" | "history";
   ignore: {
     paths: string[];
     patterns: string[];

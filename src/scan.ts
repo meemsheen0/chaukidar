@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import type { Config, Detector, Finding } from "./types.js";
 import { isAllowedValue, buildUserAllowlist } from "./allowlist.js";
 import { detectors as allDetectors } from "./detectors/index.js";
@@ -98,13 +98,20 @@ export interface ScanResult {
   filesScanned: number;
 }
 
-export function scanRepo(root: string, config: Config): ScanResult {
-  const activeDetectors: Detector[] = allDetectors.filter(
-    (d) => config.detectors[d.type] !== false
-  );
+function activeDetectors(config: Config): Detector[] {
+  return allDetectors.filter((d) => config.detectors[d.type] !== false);
+}
+
+function buildIsAllowed(config: Config) {
   const userAllowed = buildUserAllowlist(config.ignore.patterns);
-  const isAllowed = (value: string) =>
-    isAllowedValue(value) || userAllowed(value);
+  return (value: string) => isAllowedValue(value) || userAllowed(value);
+}
+
+export function scanRepo(root: string, config: Config): ScanResult {
+  if (config.scan === "history") return scanHistory(root, config);
+
+  const detectors = activeDetectors(config);
+  const isAllowed = buildIsAllowed(config);
 
   const candidates =
     config.scan === "changed" ? listChangedFiles(root) : listAllFiles(root);
@@ -136,7 +143,7 @@ export function scanRepo(root: string, config: Config): ScanResult {
     filesScanned++;
     const lines = buf.toString("utf8").split(/\r?\n/);
     lines.forEach((line, idx) => {
-      for (const det of activeDetectors) {
+      for (const det of detectors) {
         const hits = det.scan(line, { file: rel, lineNo: idx + 1, isAllowed });
         findings.push(...hits);
       }
@@ -144,6 +151,107 @@ export function scanRepo(root: string, config: Config): ScanResult {
   }
 
   return { findings, filesScanned };
+}
+
+/** Every blob ever committed (deduped by SHA), with one representative path. */
+function listHistoryBlobs(root: string): { sha: string; path: string }[] {
+  let out: string;
+  try {
+    out = execFileSync("git", ["rev-list", "--all", "--objects"], {
+      cwd: root,
+      maxBuffer: 256 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).toString();
+  } catch {
+    return []; // not a git repo, or git unavailable
+  }
+  const seen = new Set<string>();
+  const blobs: { sha: string; path: string }[] = [];
+  for (const line of out.split("\n")) {
+    const sp = line.indexOf(" ");
+    if (sp === -1) continue; // commits/tags have no path
+    const sha = line.slice(0, sp);
+    const path = line.slice(sp + 1);
+    if (!path || seen.has(sha)) continue;
+    if (SKIP_EXT.has(extname(path))) continue;
+    seen.add(sha);
+    blobs.push({ sha, path });
+  }
+  return blobs;
+}
+
+/**
+ * Scan the full git history — every version of every file ever committed —
+ * not just the working tree. This is where most real leaks hide: a secret
+ * committed once and "removed" in a later commit still lives in history.
+ *
+ * Findings are deduped per (type + masked value + path) so the same secret
+ * appearing across many historical versions is reported once, tagged with the
+ * blob SHA so the user can locate it via `git log --all --find-object=<sha>`.
+ */
+export function scanHistory(root: string, config: Config): ScanResult {
+  const detectors = activeDetectors(config);
+  const isAllowed = buildIsAllowed(config);
+  const blobs = listHistoryBlobs(root);
+  if (!blobs.length) return { findings: [], filesScanned: 0 };
+
+  const pathOf = new Map(blobs.map((b) => [b.sha, b.path]));
+  let raw: Buffer;
+  try {
+    raw = execFileSync("git", ["cat-file", "--batch"], {
+      cwd: root,
+      input: blobs.map((b) => b.sha).join("\n") + "\n",
+      maxBuffer: 512 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+  } catch {
+    return { findings: [], filesScanned: 0 };
+  }
+
+  const findings: Finding[] = [];
+  const seenFinding = new Set<string>();
+  let blobsScanned = 0;
+  let i = 0;
+
+  // `git cat-file --batch` output: "<sha> <type> <size>\n<size bytes>\n" per object.
+  while (i < raw.length) {
+    const nl = raw.indexOf(0x0a, i);
+    if (nl === -1) break;
+    const header = raw.toString("utf8", i, nl);
+    i = nl + 1;
+    const parts = header.split(" ");
+    const type = parts[1];
+    if (type !== "blob") {
+      // Non-blob (tree) or "<sha> missing" — skip its bytes if it has any.
+      const size = Number(parts[2]);
+      if (Number.isFinite(size)) i += size + 1;
+      continue;
+    }
+    const sha = parts[0];
+    const size = Number(parts[2]);
+    const content = raw.subarray(i, i + size);
+    i += size + 1; // content + trailing newline
+
+    const path = pathOf.get(sha) ?? sha;
+    if (isIgnoredPath(path, config.ignore.paths)) continue;
+    if (size > MAX_BYTES || looksBinary(content)) continue;
+
+    blobsScanned++;
+    const short = sha.slice(0, 9);
+    const lines = content.toString("utf8").split(/\r?\n/);
+    lines.forEach((line, idx) => {
+      for (const det of detectors) {
+        for (const f of det.scan(line, { file: path, lineNo: idx + 1, isAllowed })) {
+          const key = `${f.type}|${f.match}|${path}`;
+          if (seenFinding.has(key)) continue;
+          seenFinding.add(key);
+          findings.push({ ...f, commit: short });
+        }
+      }
+    });
+  }
+
+  return { findings, filesScanned: blobsScanned };
 }
 
 function extname(file: string): string {
