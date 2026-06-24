@@ -36,15 +36,43 @@ Findings show up as inline annotations on the PR diff plus a job-summary table. 
 
 ## Quick start — CLI
 
+The `scan` keyword is optional — point Chaukidar straight at a path:
+
 ```bash
-npx chaukidar scan .
-npx chaukidar scan . --fail-on=medium --scan=all
+npx chaukidar .
+npx chaukidar . --fail-on=medium --scan=all
+```
+
+### Audit many repos at once
+
+Pass several paths and Chaukidar prints a combined summary table plus per-repo
+detail, and exits non-zero if **any** repo trips its threshold:
+
+```bash
+npx chaukidar ~/code/app1 ~/code/app2 ~/code/app3
+npx chaukidar ~/code/*            # shell-expanded glob
+```
+
+```
+چوکیدار  Chaukidar — 3 repo(s): 4 finding(s) across 3 file(s)
+
+    REPO         HIGH   MED   LOW    FILES
+  ✗ app1            1     1     0        1
+  ✗ app2            1     1     0        1
+  ✓ app3            0     0     0        1
+```
+
+Add `--report[=file]` to also write a shareable Markdown report
+(default `chaukidar-report.md`):
+
+```bash
+npx chaukidar ~/code/* --scan=all --report=audit.md
 ```
 
 As a pre-commit hook (with [husky](https://typicode.github.io/husky/) or similar):
 
 ```bash
-npx chaukidar scan . --scan=changed --fail-on=high
+npx chaukidar . --scan=changed --fail-on=high
 ```
 
 ## What it detects

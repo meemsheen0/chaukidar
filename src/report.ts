@@ -78,3 +78,88 @@ export function shouldFail(findings: Finding[], failOn: Severity | "off"): boole
   const threshold = SEVERITY_ORDER[failOn];
   return findings.some((f) => SEVERITY_ORDER[f.severity] >= threshold);
 }
+
+/** One repo's worth of results, for multi-repo runs. */
+export interface RepoResult {
+  /** Absolute path scanned. */
+  repo: string;
+  /** Short display name (usually the folder name). */
+  name: string;
+  findings: Finding[];
+  filesScanned: number;
+  failOn: Severity | "off";
+}
+
+/** Combined terminal report across several repos: a summary table, then detail. */
+export function toMultiConsole(results: RepoResult[]): string {
+  const totalFindings = results.reduce((n, r) => n + r.findings.length, 0);
+  const totalFiles = results.reduce((n, r) => n + r.filesScanned, 0);
+  const lines: string[] = [
+    `چوکیدار  Chaukidar — ${results.length} repo(s): ${totalFindings} finding(s) across ${totalFiles} file(s)`,
+    "",
+  ];
+
+  const nameW = Math.max(4, ...results.map((r) => r.name.length));
+  lines.push(
+    `    ${"REPO".padEnd(nameW)}   HIGH   MED   LOW    FILES`
+  );
+  for (const r of results) {
+    const c = countBySeverity(r.findings);
+    const flag = shouldFail(r.findings, r.failOn) ? "✗" : "✓";
+    lines.push(
+      `  ${flag} ${r.name.padEnd(nameW)}  ${String(c.high).padStart(5)} ${String(
+        c.medium
+      ).padStart(5)} ${String(c.low).padStart(5)}   ${String(
+        r.filesScanned
+      ).padStart(6)}`
+    );
+  }
+
+  for (const r of results) {
+    if (!r.findings.length) continue;
+    lines.push("", `  ── ${r.name} ──`);
+    for (const f of sortFindings(r.findings)) {
+      lines.push(
+        `  ${ICON[f.severity]} ${f.severity.toUpperCase().padEnd(6)} ${f.file}:${f.line}:${f.column}  ${f.label}  →  ${f.match}`
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+/** Combined markdown report across several repos — for --report / sharing. */
+export function toMultiMarkdown(results: RepoResult[]): string {
+  const totalFindings = results.reduce((n, r) => n + r.findings.length, 0);
+  const totalFiles = results.reduce((n, r) => n + r.filesScanned, 0);
+  const out: string[] = [
+    "# 🛡️ Chaukidar report",
+    "",
+    `Scanned **${results.length} repo(s)** — ${totalFindings} finding(s) across ${totalFiles} file(s).`,
+    "",
+    "| Repo | High | Medium | Low | Files | Status |",
+    "| --- | ---: | ---: | ---: | ---: | :---: |",
+  ];
+  for (const r of results) {
+    const c = countBySeverity(r.findings);
+    const status = shouldFail(r.findings, r.failOn) ? "❌ fail" : "✅ pass";
+    out.push(
+      `| ${r.name} | ${c.high} | ${c.medium} | ${c.low} | ${r.filesScanned} | ${status} |`
+    );
+  }
+  for (const r of results) {
+    if (!r.findings.length) continue;
+    out.push(
+      "",
+      `## ${r.name}`,
+      "",
+      "| Severity | Location | Type | Match |",
+      "| --- | --- | --- | --- |"
+    );
+    for (const f of sortFindings(r.findings)) {
+      out.push(
+        `| ${ICON[f.severity]} ${f.severity} | \`${f.file}:${f.line}\` | ${f.label} | \`${f.match}\` |`
+      );
+    }
+  }
+  return out.join("\n");
+}
